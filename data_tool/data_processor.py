@@ -5,6 +5,7 @@ from typing import List, Tuple
 import json
 from dotenv import load_dotenv
 import shutil
+import sqlite3
 
 def filter_data_by_date(file_path: str, start_date: str, end_date: str, date_column: str) -> pd.DataFrame:
     """
@@ -175,6 +176,60 @@ def process_screenshots(start_date: str, end_date: str):
             except Exception as e:
                 print(f"Error processing file {file_name}: {e}")
 
+def process_apple_photos(start_date: str, end_date: str):
+    """
+    Processes Apple Photos library for the specified date range by copying photos to the output folder.
+
+    Args:
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+    """
+    load_dotenv()
+    photos_library_path = os.getenv("APPLE_PHOTOS_LIBRARY_PATH")
+    output_dir = os.getenv("OUTPUT_PATH")
+
+    if not photos_library_path or not os.path.exists(photos_library_path):
+        print("Apple Photos library path not found or not specified in .env file.")
+        return
+    if not output_dir:
+        print("Output path not specified in .env file.")
+        return
+
+    photos_output_dir = os.path.join(output_dir, "apple_photos")
+    os.makedirs(photos_output_dir, exist_ok=True)
+
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+
+    # Connect to the Photos library database
+    db_path = os.path.join(photos_library_path, "database", "Photos.sqlite")
+    if not os.path.exists(db_path):
+        print("Photos.sqlite database not found in the specified library path.")
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Query for photos within the date range
+    query = """
+        SELECT ZDIRECTORY, ZFILENAME, ZDATECREATED
+        FROM ZASSET
+        WHERE ZDATECREATED BETWEEN ? AND ?
+    """
+    start_timestamp = start.timestamp()
+    end_timestamp = end.timestamp()
+
+    cursor.execute(query, (start_timestamp, end_timestamp))
+    results = cursor.fetchall()
+
+    for directory, filename, _ in results:
+        photo_path = os.path.join(photos_library_path, "originals", directory, filename)
+        if os.path.exists(photo_path):
+            shutil.copy(photo_path, photos_output_dir)
+            print(f"Copied photo: {filename}")
+
+    conn.close()
+
 def process_all_data(start_date: str, end_date: str):
     """
     Processes all data types (Spotify, screenshots, etc.) for the specified date range.
@@ -185,3 +240,4 @@ def process_all_data(start_date: str, end_date: str):
     """
     process_spotify_data(start_date, end_date)
     process_screenshots(start_date, end_date)
+    process_apple_photos(start_date, end_date)
