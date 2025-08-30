@@ -77,9 +77,37 @@ def filter_spotify_data(file_path: str, start_date: str, end_date: str) -> list:
 
     return filtered_data
 
+def save_spotify_data_for_journaling(filtered_data: list, output_dir: str, start_date: str, end_date: str):
+    """
+    Saves Spotify data in an optimized format for journaling.
+
+    Args:
+        filtered_data (list): Filtered Spotify data.
+        output_dir (str): Directory to save the output file.
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, f"spotify_journal_{start_date}_to_{end_date}.txt")
+
+    with open(output_file, "w") as file:
+        for entry in filtered_data:
+            journal_entry = (
+                f"Date: {entry['ts']}\n"
+                f"Track: {entry['master_metadata_track_name']}\n"
+                f"Artist: {entry['master_metadata_album_artist_name']}\n"
+                f"Album: {entry['master_metadata_album_album_name']}\n"
+                f"Platform: {entry['platform']}\n"
+                f"Time Played: {entry['ms_played']} ms\n"
+                "---\n"
+            )
+            file.write(journal_entry)
+
+    print(f"Journal-ready Spotify data saved to: {output_file}")
+
 def process_spotify_data(start_date: str, end_date: str):
     """
-    Processes Spotify data for the specified date range.
+    Processes Spotify data for the specified date range and saves it for journaling.
 
     Args:
         start_date (str): Start date in YYYY-MM-DD format.
@@ -87,10 +115,16 @@ def process_spotify_data(start_date: str, end_date: str):
     """
     load_dotenv()
     spotify_path = os.getenv("SPOTIFY_DATA_PATH")
+    output_dir = os.getenv("OUTPUT_PATH")
 
     if not spotify_path or not os.path.exists(spotify_path):
         print("Spotify data path not found or not specified in .env file.")
         return
+    if not output_dir:
+        print("Output path not specified in .env file.")
+        return
+
+    os.makedirs(output_dir, exist_ok=True)
 
     # Identify the correct JSON file based on naming convention
     for file_name in os.listdir(spotify_path):
@@ -100,9 +134,5 @@ def process_spotify_data(start_date: str, end_date: str):
 
             filtered_data = filter_spotify_data(file_path, start_date, end_date)
 
-            # Save the filtered data to a new JSON file
-            output_file = os.path.join(spotify_path, f"Filtered_{file_name}")
-            with open(output_file, "w") as output:
-                json.dump(filtered_data, output, indent=4)
-
-            print(f"Filtered Spotify data saved to: {output_file}")
+            # Save the filtered data in an optimized format for journaling
+            save_spotify_data_for_journaling(filtered_data, output_dir, start_date, end_date)
