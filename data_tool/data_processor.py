@@ -230,6 +230,62 @@ def process_apple_photos(start_date: str, end_date: str):
 
     conn.close()
 
+def process_location_history(start_date: str, end_date: str):
+    """
+    Processes location history JSON files for the specified date range and saves the results in an optimized format.
+
+    Args:
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+    """
+    load_dotenv()
+    location_history_path = os.getenv("LOCATION_HISTORY_PATH")
+    output_dir = os.getenv("OUTPUT_PATH")
+
+    if not location_history_path or not os.path.exists(location_history_path):
+        print("Location history path not found or not specified in .env file.")
+        return
+    if not output_dir:
+        print("Output path not specified in .env file.")
+        return
+
+    location_output_dir = os.path.join(output_dir, "location_history")
+    os.makedirs(location_output_dir, exist_ok=True)
+
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+
+    for file_name in os.listdir(location_history_path):
+        if file_name.endswith(".json"):
+            file_path = os.path.join(location_history_path, file_name)
+            print(f"Processing location history file: {file_path}")
+
+            with open(file_path, "r") as file:
+                data = json.load(file)
+
+            filtered_data = [
+                entry for entry in data
+                if start <= datetime.strptime(entry["timestamp"], "%Y-%m-%dT%H:%M:%SZ") <= end
+            ]
+
+            # Save the filtered data in an optimized format
+            output_file = os.path.join(location_output_dir, f"filtered_{file_name}")
+            with open(output_file, "w") as output:
+                for entry in filtered_data:
+                    location_entry = (
+                        f"Timestamp: {entry['timestamp']}\n"
+                        f"Place: {entry['location']['placeName']}\n"
+                        f"Locality: {entry['location']['localityName']}\n"
+                        f"Country: {entry['location']['country']}\n"
+                        f"Coordinates: ({entry['location']['latitude']}, {entry['location']['longitude']})\n"
+                        f"Arrival: {entry['arrivalDate']}\n"
+                        f"Departure: {entry['departureDate']}\n"
+                        "---\n"
+                    )
+                    output.write(location_entry)
+
+            print(f"Filtered location history saved to: {output_file}")
+
 def process_all_data(start_date: str, end_date: str):
     """
     Processes all data types (Spotify, screenshots, etc.) for the specified date range.
@@ -241,3 +297,4 @@ def process_all_data(start_date: str, end_date: str):
     process_spotify_data(start_date, end_date)
     process_screenshots(start_date, end_date)
     process_apple_photos(start_date, end_date)
+    process_location_history(start_date, end_date)
