@@ -260,31 +260,40 @@ def process_location_history(start_date: str, end_date: str):
             file_path = os.path.join(location_history_path, file_name)
             print(f"Processing location history file: {file_path}")
 
-            with open(file_path, "r") as file:
-                data = json.load(file)
+            try:
+                with open(file_path, "r") as file:
+                    # Preprocess the JSON to remove trailing commas
+                    raw_data = file.read()
+                    cleaned_data = raw_data.replace(",\n]", "\n]").replace(",\n}", "\n}")
+                    data = json.loads(cleaned_data)
 
-            filtered_data = [
-                entry for entry in data
-                if start <= datetime.strptime(entry["timestamp"], "%Y-%m-%dT%H:%M:%SZ") <= end
-            ]
+                filtered_data = [
+                    entry for entry in data
+                    if start <= datetime.strptime(entry["timestamp"], "%Y-%m-%dT%H:%M:%SZ") <= end
+                ]
 
-            # Save the filtered data in an optimized format
-            output_file = os.path.join(location_output_dir, f"filtered_{file_name}")
-            with open(output_file, "w") as output:
-                for entry in filtered_data:
-                    location_entry = (
-                        f"Timestamp: {entry['timestamp']}\n"
-                        f"Place: {entry['location']['placeName']}\n"
-                        f"Locality: {entry['location']['localityName']}\n"
-                        f"Country: {entry['location']['country']}\n"
-                        f"Coordinates: ({entry['location']['latitude']}, {entry['location']['longitude']})\n"
-                        f"Arrival: {entry['arrivalDate']}\n"
-                        f"Departure: {entry['departureDate']}\n"
-                        "---\n"
-                    )
-                    output.write(location_entry)
+                # Save the filtered data in an optimized format
+                output_file = os.path.join(location_output_dir, f"filtered_{file_name}")
+                with open(output_file, "w") as output:
+                    for entry in filtered_data:
+                        location_entry = (
+                            f"Timestamp: {entry['timestamp']}\n"
+                            f"Place: {entry['location']['placeName']}\n"
+                            f"Locality: {entry['location']['localityName']}\n"
+                            f"Country: {entry['location']['country']}\n"
+                            f"Coordinates: ({entry['location']['latitude']}, {entry['location']['longitude']})\n"
+                            f"Arrival: {entry['arrivalDate']}\n"
+                            f"Departure: {entry['departureDate']}\n"
+                            "---\n"
+                        )
+                        output.write(location_entry)
 
-            print(f"Filtered location history saved to: {output_file}")
+                print(f"Filtered location history saved to: {output_file}")
+
+            except json.JSONDecodeError as e:
+                print(f"Error decoding JSON in file {file_name}: {e}")
+            except Exception as e:
+                print(f"Unexpected error processing file {file_name}: {e}")
 
 def process_all_data(start_date: str, end_date: str):
     """
