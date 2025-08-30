@@ -1,0 +1,108 @@
+import os
+import pandas as pd
+from datetime import datetime
+from typing import List, Tuple
+import json
+from dotenv import load_dotenv
+
+def filter_data_by_date(file_path: str, start_date: str, end_date: str, date_column: str) -> pd.DataFrame:
+    """
+    Filters data from a file based on a date range.
+
+    Args:
+        file_path (str): Path to the data file.
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+        date_column (str): Name of the column containing dates.
+
+    Returns:
+        pd.DataFrame: Filtered data.
+    """
+    # Read the file into a DataFrame
+    data = pd.read_csv(file_path)
+
+    # Convert the date column to datetime
+    data[date_column] = pd.to_datetime(data[date_column])
+
+    # Filter the data based on the date range
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    filtered_data = data[(data[date_column] >= start) & (data[date_column] <= end)]
+
+    return filtered_data
+
+def process_data_sources(sources: List[Tuple[str, str, str]], start_date: str, end_date: str):
+    """
+    Processes multiple data sources and filters data for the specified date range.
+
+    Args:
+        sources (List[Tuple[str, str, str]]): List of tuples containing file path, date column, and output path.
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+    """
+    for file_path, date_column, output_path in sources:
+        if not os.path.exists(file_path):
+            print(f"File not found: {file_path}")
+            continue
+
+        print(f"Processing file: {file_path}")
+        filtered_data = filter_data_by_date(file_path, start_date, end_date, date_column)
+
+        # Save the filtered data to the output path
+        filtered_data.to_csv(output_path, index=False)
+        print(f"Filtered data saved to: {output_path}")
+
+def filter_spotify_data(file_path: str, start_date: str, end_date: str) -> list:
+    """
+    Filters Spotify JSON data based on a date range.
+
+    Args:
+        file_path (str): Path to the Spotify JSON file.
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+
+    Returns:
+        list: Filtered JSON data.
+    """
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+
+    with open(file_path, "r") as file:
+        data = json.load(file)
+
+    filtered_data = [
+        entry for entry in data
+        if start <= datetime.strptime(entry["ts"], "%Y-%m-%dT%H:%M:%SZ") <= end
+    ]
+
+    return filtered_data
+
+def process_spotify_data(start_date: str, end_date: str):
+    """
+    Processes Spotify data for the specified date range.
+
+    Args:
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+    """
+    load_dotenv()
+    spotify_path = os.getenv("SPOTIFY_DATA_PATH")
+
+    if not spotify_path or not os.path.exists(spotify_path):
+        print("Spotify data path not found or not specified in .env file.")
+        return
+
+    # Identify the correct JSON file based on naming convention
+    for file_name in os.listdir(spotify_path):
+        if file_name.startswith("Streaming_History_Audio") and file_name.endswith(".json"):
+            file_path = os.path.join(spotify_path, file_name)
+            print(f"Processing Spotify file: {file_path}")
+
+            filtered_data = filter_spotify_data(file_path, start_date, end_date)
+
+            # Save the filtered data to a new JSON file
+            output_file = os.path.join(spotify_path, f"Filtered_{file_name}")
+            with open(output_file, "w") as output:
+                json.dump(filtered_data, output, indent=4)
+
+            print(f"Filtered Spotify data saved to: {output_file}")
